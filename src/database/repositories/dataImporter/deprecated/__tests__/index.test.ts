@@ -15,7 +15,7 @@ import { getTestDBInstance } from '@/database/server/core/dbForTest';
 import { CURRENT_CONFIG_VERSION } from '@/migrations';
 import { ImporterEntryData } from '@/types/importer';
 
-import { DataImporterRepos } from '../index';
+import { DeprecatedDataImporterRepos as DataImporterRepos } from '../index';
 import mockImportData from './fixtures/messages.json';
 
 const serverDB = await getTestDBInstance();
