@@ -10,7 +10,7 @@ interface BaseTableConfig {
   userField?: string;
 }
 
-interface RelationTableConfig {
+export interface RelationTableConfig {
   relations: {
     field: string;
     sourceField?: string;
@@ -22,13 +22,13 @@ interface RelationTableConfig {
 
 export const DATA_EXPORT_CONFIG = {
   baseTables: [
-    { table: 'users', userField: 'id' },
+    // { table: 'users', userField: 'id' },
     { table: 'userSettings', userField: 'id' },
     { table: 'userInstalledPlugins' },
     { table: 'agents' },
-    { table: 'agentsFiles' },
+    // { table: 'agentsFiles' },
     { table: 'agentsKnowledgeBases' },
-    { table: 'agentsToSessions' },
+    // { table: 'agentsToSessions' },
     { table: 'aiModels' },
     { table: 'aiProviders' },
     // async tasks should not be included
@@ -46,7 +46,7 @@ export const DATA_EXPORT_CONFIG = {
     { table: 'messageQueryChunks' },
     { table: 'messageQueries' },
     { table: 'messageTranslates' },
-    { table: 'messageTTS' },
+    // { table: 'messageTTS' },
     { table: 'messages' },
     // { table: 'messagesFiles' },
 
@@ -60,13 +60,24 @@ export const DATA_EXPORT_CONFIG = {
     { table: 'sessions' },
     { table: 'threads' },
     { table: 'topics' },
-
   ] as BaseTableConfig[],
   relationTables: [
+    // {
+    //   relations: [{ field: 'hashId', sourceField: 'fileHash', sourceTable: 'files' }],
+    //   table: 'globalFiles',
+    // },
     {
-      relations: [{ field: 'hashId', sourceField: 'fileHash', sourceTable: 'files' }],
-      table: 'globalFiles',
+      relations: [
+        { field: 'agentId', sourceField: 'id', sourceTable: 'agents' },
+        { field: 'sessionId', sourceField: 'id', sourceTable: 'sessions' },
+      ],
+      table: 'agentsToSessions',
     },
+
+    // {
+    //   relations: [{ field: 'id', sourceField: 'id', sourceTable: 'messages' }],
+    //   table: 'messagePlugins',
+    // },
   ] as RelationTableConfig[],
 };
 
