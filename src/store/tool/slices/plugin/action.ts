@@ -69,7 +69,6 @@ export const createPluginSlice: StateCreator<
 
     // validate the settings
     const { Validator } = await import('@cfworker/json-schema');
-
     const validator = new Validator(manifest.settings as Schema);
     const result = validator.validate(settings);
 
