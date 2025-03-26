@@ -91,6 +91,14 @@ const IMPORT_TABLE_CONFIG: TableImportConfig[] = [
     uniqueConstraints: [],
   },
   {
+    fieldProcessors: {
+      slug: (value) => (value ? `${value}-${uuid().slice(0, 8)}` : null),
+    },
+    table: 'agents',
+    type: 'base',
+    uniqueConstraints: ['slug'],
+  },
+  {
     // 对slug字段进行特殊处理
     fieldProcessors: {
       slug: (value) => `${value}-${uuid().slice(0, 8)}`,
@@ -102,7 +110,7 @@ const IMPORT_TABLE_CONFIG: TableImportConfig[] = [
       },
     ],
     table: 'sessions',
-    type: 'relation',
+    type: 'base',
     uniqueConstraints: ['slug'],
   },
   {
@@ -113,45 +121,7 @@ const IMPORT_TABLE_CONFIG: TableImportConfig[] = [
       },
     ],
     table: 'topics',
-    type: 'relation',
-  },
-  {
-    fieldProcessors: {
-      slug: (value) => (value ? `${value}-${uuid().slice(0, 8)}` : null),
-    },
-    table: 'agents',
     type: 'base',
-    uniqueConstraints: ['slug'],
-  },
-  {
-    isCompositeKey: true, // 使用复合主键 [fileId, agentId, userId]
-    relations: [
-      {
-        field: 'agentId',
-        sourceTable: 'agents',
-      },
-      {
-        field: 'fileId',
-        sourceTable: 'files',
-      },
-    ],
-    table: 'agentsFiles',
-    type: 'relation',
-  },
-  {
-    isCompositeKey: true, // 使用复合主键 [agentId, knowledgeBaseId]
-    relations: [
-      {
-        field: 'agentId',
-        sourceTable: 'agents',
-      },
-      {
-        field: 'knowledgeBaseId',
-        sourceTable: 'knowledgeBases',
-      },
-    ],
-    table: 'agentsKnowledgeBases',
-    type: 'relation',
   },
   {
     isCompositeKey: true, // 使用复合主键 [agentId, sessionId]
@@ -182,7 +152,7 @@ const IMPORT_TABLE_CONFIG: TableImportConfig[] = [
       },
     ],
     table: 'threads',
-    type: 'relation',
+    type: 'base',
   },
   {
     relations: [
@@ -213,7 +183,7 @@ const IMPORT_TABLE_CONFIG: TableImportConfig[] = [
       },
     ],
     table: 'messages',
-    type: 'relation',
+    type: 'base',
   },
   {
     conflictStrategy: 'skip',
@@ -300,7 +270,7 @@ const IMPORT_TABLE_CONFIG: TableImportConfig[] = [
         sourceTable: 'files',
       },
     ],
-    table: 'messageTts',
+    table: 'messageTTS',
     type: 'relation',
   },
 ];
@@ -679,12 +649,11 @@ export class DataImporterRepos {
 
         const itemsToInsert = batch.map((item) => item.newItem);
         const originalIds = batch.map((item) => item.originalId);
-        console.log('itemsToInsert:', itemsToInsert);
 
         try {
           // 插入并返回结果
           const res = await trx.insert(table).values(itemsToInsert).returning();
-          const insertResult = res.map((item) => ({
+          const insertResult = res.map((item: any) => ({
             clientId: item?.clientId || undefined,
             id: isCompositeKey ? undefined : item?.id,
           }));
@@ -707,8 +676,8 @@ export class DataImporterRepos {
           console.error(`Error batch inserting ${tableName}:`, error);
 
           // 处理错误并记录
-          if (error.code === '23505') {
-            const match = error.detail?.match(/Key \((.+?)\)=\((.+?)\) already exists/);
+          if ((error as any).code === '23505') {
+            const match = (error as any).detail?.match(/Key \((.+?)\)=\((.+?)\) already exists/);
             if (match) {
               const conflictField = match[1];
               if (!result.conflictFields) result.conflictFields = [];
@@ -861,7 +830,9 @@ export class DataImporterRepos {
         for (const relation of relations) {
           const { field, sourceTable } = relation;
 
+          console.log(this.idMaps);
           if (newRecord[field] && this.idMaps[sourceTable]) {
+
             const mappedId = this.idMaps[sourceTable][newRecord[field]];
 
             if (mappedId) {
@@ -982,10 +953,11 @@ export class DataImporterRepos {
           // 只对非复合主键的表需要返回ID
           let insertResult;
           if (!isCompositeKey) {
-            insertResult = await insertQuery.returning({
-              clientId: 'clientId' in table ? table.clientId : undefined,
-              id: table.id,
-            });
+            const res = await insertQuery;
+            insertResult = res.rows.map((item: any) => ({
+              clientId: 'clientId' in table ? item.clientId : undefined,
+              id: item.id,
+            }));
           } else {
             await insertQuery;
             insertResult = itemsToInsert.map(() => ({})); // 创建空结果以维持计数

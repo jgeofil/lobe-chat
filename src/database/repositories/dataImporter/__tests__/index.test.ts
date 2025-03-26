@@ -7,6 +7,7 @@ import { ExportPgDataStructure } from '@/types/export';
 
 import { DataImporterRepos } from '../index';
 import agentsData from './fixtures/agents.json';
+import topicsData from './fixtures/topic.json';
 import userSettingsData from './fixtures/userSettings.json';
 
 const clientDB = await getTestDB();
@@ -96,6 +97,29 @@ describe('DataImporter', () => {
 
       expect(agentRes[0].clientId).toEqual(agentsData.data.agents[0].id);
       expect(sessionRes[0].clientId).toEqual(agentsData.data.sessions[0].id);
+    });
+  });
+
+  describe('import message and topic', () => {
+    it('should import return correct result', async () => {
+      const exportData = topicsData as ExportPgDataStructure;
+      const result = await importer.importData(exportData);
+
+      expect(result.success).toBe(true);
+      expect(result.results.messages).toMatchObject({ added: 6, errors: 0, skips: 0 });
+
+      const messageRes = await clientDB.query.messages.findMany({
+        where: eq(Schema.agents.userId, userId),
+      });
+      const topicRes = await clientDB.query.topics.findMany({
+        where: eq(Schema.sessions.userId, userId),
+      });
+
+      expect(topicRes).toHaveLength(1);
+      expect(messageRes).toHaveLength(6);
+
+      expect(topicRes[0].clientId).toEqual(topicsData.data.topics[0].id);
+      expect(messageRes[0].clientId).toEqual(topicsData.data.messages[0].id);
     });
   });
 });
