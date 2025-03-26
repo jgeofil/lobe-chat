@@ -651,13 +651,11 @@ export class DataImporterRepos {
                 break;
               }
               case 'merge': {
-                console.log(field, record.newItem[field], table[field], record);
                 // 合并数据
-                const mergeData = await trx
-                  .update(tableName)
+                await trx
+                  .update(table)
                   .set(record.newItem)
                   .where(eq(table[field], record.newItem[field]));
-                console.log('mergeData:', mergeData);
                 record.newItem._skip = true;
                 result.updated++;
                 break;
