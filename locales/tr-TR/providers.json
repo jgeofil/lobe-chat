@@ -146,6 +146,9 @@
   "xai": {
     "description": "xAI, insan bilimsel keşiflerini hızlandırmak için yapay zeka geliştirmeye adanmış bir şirkettir. Misyonumuz, evrene dair ortak anlayışımızı ilerletmektir."
   },
+  "xinference": {
+    "description": "Xorbits Inference (Xinference), çeşitli AI modellerinin çalıştırılmasını ve entegrasyonunu basitleştirmek için tasarlanmış açık kaynaklı bir platformdur. Xinference ile, herhangi bir açık kaynak LLM, gömme modeli ve çok modlu modeli bulut veya yerel ortamda çalıştırabilir ve güçlü AI uygulamaları oluşturabilirsiniz."
+  },
   "zeroone": {
     "description": "01.AI, yapay zeka 2.0 çağının yapay zeka teknolojisine odaklanmakta ve 'insan + yapay zeka' yenilik ve uygulamalarını teşvik etmektedir. Son derece güçlü modeller ve gelişmiş yapay zeka teknolojileri kullanarak insan üretkenliğini artırmayı ve teknolojik güçlendirmeyi hedeflemektedir."
   },
