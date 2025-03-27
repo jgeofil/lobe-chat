@@ -119,7 +119,9 @@ describe('DataImporter', () => {
       expect(messageRes).toHaveLength(6);
 
       expect(topicRes[0].clientId).toEqual(topicsData.data.topics[0].id);
-      expect(messageRes[0].clientId).toEqual(topicsData.data.messages[0].id);
+      expect(
+        messageRes.find((msg) => msg.content === topicsData.data.messages[0].content)?.clientId,
+      ).toEqual(topicsData.data.messages[0].id);
     });
   });
 });
