@@ -183,7 +183,7 @@ const IMPORT_TABLE_CONFIG: TableImportConfig[] = [
       },
     ],
     table: 'messages',
-    type: 'base',
+    type: 'relation',
   },
   {
     conflictStrategy: 'skip',
@@ -528,7 +528,7 @@ export class DataImporterRepos {
           existingRecords = [
             ...existingRecords,
             ...idExistingRecords.filter(
-              (record) => !existingRecords.some((existing) => existing.id === record.id),
+              (record: any) => !existingRecords.some((existing) => existing.id === record.id),
             ),
           ];
         }
@@ -627,7 +627,10 @@ export class DataImporterRepos {
                   .set(record.newItem)
                   .where(eq(table[field], record.newItem[field]));
                 record.newItem._skip = true;
-                result.updated++;
+                if (result.updated) result.updated++;
+                else {
+                  result.updated = 1;
+                }
                 break;
               }
             }
@@ -832,7 +835,6 @@ export class DataImporterRepos {
 
           console.log(this.idMaps);
           if (newRecord[field] && this.idMaps[sourceTable]) {
-
             const mappedId = this.idMaps[sourceTable][newRecord[field]];
 
             if (mappedId) {
