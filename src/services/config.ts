@@ -91,7 +91,7 @@ class ConfigService {
   };
 
   private createDataStructure = async (
-    data: object,
+    data: any,
     mode: 'pglite' | 'postgres',
   ): Promise<ExportPgDataStructure> => {
     const { default: json } = await import('@/database/client/migrations.json');

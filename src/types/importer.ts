@@ -152,14 +152,12 @@ export interface OnImportCallbacks {
 export type ImportResultData = ImportSuccessResult | ImportErrorResult;
 
 export interface ImportSuccessResult {
-  conflictRecords?: string[];
   results: Record<string, any>;
   success: true;
 }
 
 export interface ImportErrorResult {
-  conflictRecords?: string[];
-  error: Error;
+  error: { details?: string; message: string };
   results: Record<string, any>;
   success: false;
 }

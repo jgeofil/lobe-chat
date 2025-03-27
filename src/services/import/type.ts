@@ -7,10 +7,11 @@ export interface IImportService {
 
   importPgData(
     data: ExportPgDataStructure,
-    options: {
+    options?: {
       callbacks?: OnImportCallbacks;
       overwriteExisting?: boolean;
     },
   ): Promise<void>;
+
   importSettings(settings: UserSettings): Promise<void>;
 }

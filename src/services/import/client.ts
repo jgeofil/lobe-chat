@@ -4,13 +4,7 @@ import { BaseClientService } from '@/services/baseClientService';
 import { useUserStore } from '@/store/user';
 import { ImportStage } from '@/types/importer';
 
-
-
 import { IImportService } from './type';
-
-
-
-
 
 export class ClientService extends BaseClientService implements IImportService {
   private get dataImporter(): DataImporterRepos {
@@ -39,15 +33,20 @@ export class ClientService extends BaseClientService implements IImportService {
     }
   };
 
-  importPgData: IImportService['importPgData'] = async (data, { callbacks }) => {
+  importPgData: IImportService['importPgData'] = async (data, { callbacks } = {}) => {
     callbacks?.onStageChange?.(ImportStage.Importing);
     const time = Date.now();
     try {
       const result = await this.dataImporter.importPgData(data);
+
       const duration = Date.now() - time;
 
       callbacks?.onStageChange?.(ImportStage.Success);
-      callbacks?.onSuccess?.(result, duration);
+      if (result.success) {
+        callbacks?.onSuccess?.(result.results, duration);
+      } else {
+        callbacks?.onError?.({ code: 'ImportError', httpStatus: 0, message: result.error.message });
+      }
     } catch (e) {
       console.error(e);
       callbacks?.onStageChange?.(ImportStage.Error);

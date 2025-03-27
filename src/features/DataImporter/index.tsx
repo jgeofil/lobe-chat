@@ -13,7 +13,7 @@ import { importService } from '@/services/import';
 import { ClientService, ImportResult, ImportResults } from '@/services/import/_deprecated';
 import { useChatStore } from '@/store/chat';
 import { useSessionStore } from '@/store/session';
-import { ExportDatabaseData } from '@/types/export';
+import { ExportDatabaseData, ExportPgDataStructure } from '@/types/export';
 import { ErrorShape, FileUploadState, ImportStage } from '@/types/importer';
 
 import ImportError from './Error';
@@ -57,7 +57,9 @@ const DataImporter = memo<DataImporterProps>(({ children, onFinishImport }) => {
   const [importError, setImportError] = useState<ErrorShape | undefined>();
   const [importResults, setImportResults] = useState<ImportResults | undefined>();
   const [showImportModal, setShowImportModal] = useState(false);
-  const [showImportData, setShowImportData] = useState<ExportDatabaseData | undefined>(undefined);
+  const [showImportData, setShowImportData] = useState<ExportDatabaseData | undefined>(
+    undefined,
+  );
 
   const dataSource = useMemo(() => {
     if (!importResults) return;

@@ -265,13 +265,7 @@ export class DataImporterRepos {
     this.deprecatedDataImporterRepos = new DeprecatedDataImporterRepos(db, userId);
   }
 
-  importData = async (
-    data: ImporterEntryData | ExportPgDataStructure,
-  ): Promise<ImportResultData> => {
-    if ('schemaHash' in data) {
-      return this.importPgData(data);
-    }
-
+  importData = async (data: ImporterEntryData): Promise<ImportResultData> => {
     const results = await this.deprecatedDataImporterRepos.importData(data);
     return { results, success: true };
   };
@@ -312,18 +306,17 @@ export class DataImporterRepos {
       });
 
       return {
-        conflictRecords: this.conflictRecords,
+        // conflictRecords: this.conflictRecords,
         results,
         success: true,
       };
     } catch (error) {
       console.error('Import failed:', error);
       return {
-        conflictRecords: this.conflictRecords,
+        // conflictRecords: this.conflictRecords,
         error: {
           details: this.extractErrorDetails(error),
-          message: error.message,
-          stack: error.stack,
+          message: (error as any).message,
         },
         results,
         success: false,

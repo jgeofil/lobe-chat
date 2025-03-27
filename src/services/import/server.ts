@@ -2,7 +2,7 @@ import { DefaultErrorShape } from '@trpc/server/unstable-core-do-not-import';
 
 import { edgeClient, lambdaClient } from '@/libs/trpc/client';
 import { useUserStore } from '@/store/user';
-import { ExportDatabaseData } from '@/types/export';
+import { ExportPgDataStructure } from '@/types/export';
 import { ImportStage, OnImportCallbacks } from '@/types/importer';
 import { uuid } from '@/utils/uuid';
 
@@ -75,12 +75,71 @@ export class ServerService implements IImportService {
   };
 
   importPgData: IImportService['importPgData'] = async (
-    data: ExportDatabaseData,
-    options: {
+    data: ExportPgDataStructure,
+    {
+      callbacks,
+    }: {
       callbacks?: OnImportCallbacks;
       overwriteExisting?: boolean;
-    },
-  ): Promise<void> => {};
+    } = {},
+  ): Promise<void> => {
+    const handleError = (e: unknown) => {
+      callbacks?.onStageChange?.(ImportStage.Error);
+      const error = e as DefaultErrorShape;
+
+      callbacks?.onError?.({
+        code: error.data.code,
+        httpStatus: error.data.httpStatus,
+        message: error.message,
+        path: error.data.path,
+      });
+    };
+
+    const totalLength = Object.values(data.data)
+      .map((d) => d.length)
+      .reduce((a, b) => a + b, 0);
+
+    if (totalLength < 500) {
+      callbacks?.onStageChange?.(ImportStage.Importing);
+      const time = Date.now();
+      try {
+        const result = await lambdaClient.importer.importByPost.mutate({ data });
+        const duration = Date.now() - time;
+
+        callbacks?.onStageChange?.(ImportStage.Success);
+        callbacks?.onSuccess?.(result, duration);
+      } catch (e) {
+        handleError(e);
+      }
+
+      return;
+    }
+
+    // if the data is too large, upload it to S3 and upload by file
+    const filename = `${uuid()}.json`;
+
+    const pathname = `import_config/${filename}`;
+
+    const url = await edgeClient.upload.createS3PreSignedUrl.mutate({ pathname });
+
+    try {
+      callbacks?.onStageChange?.(ImportStage.Uploading);
+      await this.uploadWithProgress(url, data, callbacks?.onFileUploading);
+    } catch {
+      throw new Error('Upload Error');
+    }
+
+    callbacks?.onStageChange?.(ImportStage.Importing);
+    const time = Date.now();
+    try {
+      const result = await lambdaClient.importer.importByFile.mutate({ pathname });
+      const duration = Date.now() - time;
+      callbacks?.onStageChange?.(ImportStage.Success);
+      callbacks?.onSuccess?.(result, duration);
+    } catch (e) {
+      handleError(e);
+    }
+  };
 
   private uploadWithProgress = async (
     url: string,

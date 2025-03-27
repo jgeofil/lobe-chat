@@ -30,7 +30,7 @@ describe('DataImporter', () => {
   describe('import userSettings', () => {
     const data = userSettingsData as ExportPgDataStructure;
     it('should import userSettings correctly', async () => {
-      const result = await importer.importData(data);
+      const result = await importer.importPgData(data);
 
       expect(result.success).toBe(true);
       expect(result.results.userSettings).toMatchObject({ added: 1, errors: 0, skips: 0 });
@@ -51,7 +51,7 @@ describe('DataImporter', () => {
           .where(eq(Schema.userSettings.id, userId));
       });
 
-      const result = await importer.importData(data);
+      const result = await importer.importPgData(data);
 
       expect(result.success).toBe(true);
       expect(result.results.userSettings).toMatchObject({
@@ -72,7 +72,7 @@ describe('DataImporter', () => {
   describe('import agents and sessions', () => {
     it('should import return correct result', async () => {
       const data = agentsData as ExportPgDataStructure;
-      const result = await importer.importData(data);
+      const result = await importer.importPgData(data);
 
       expect(result.success).toBe(true);
       expect(result.results.agents).toMatchObject({ added: 1, errors: 0, skips: 0 });
@@ -103,7 +103,7 @@ describe('DataImporter', () => {
   describe('import message and topic', () => {
     it('should import return correct result', async () => {
       const exportData = topicsData as ExportPgDataStructure;
-      const result = await importer.importData(exportData);
+      const result = await importer.importPgData(exportData);
 
       expect(result.success).toBe(true);
       expect(result.results.messages).toMatchObject({ added: 6, errors: 0, skips: 0 });

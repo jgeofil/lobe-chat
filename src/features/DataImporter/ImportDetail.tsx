@@ -7,11 +7,11 @@ import { Info } from 'lucide-react';
 import { useState } from 'react';
 import { Flexbox } from 'react-layout-kit';
 
-import { ExportDatabaseData } from '@/types/export';
+import { ExportPgDataStructure } from '@/types/export';
 
 const { Text } = Typography;
 
-const getNonEmptyTables = (data: ExportDatabaseData) => {
+const getNonEmptyTables = (data: ExportPgDataStructure) => {
   const result = [];
 
   for (const [key, value] of Object.entries(data.data)) {
@@ -81,7 +81,7 @@ const useStyles = createStyles(({ token, css }) => {
 });
 
 interface ImportPreviewModalProps {
-  importData: ExportDatabaseData;
+  importData: ExportPgDataStructure;
   onCancel?: () => void;
   onConfirm?: (overwriteExisting: boolean) => void;
   onOpenChange: (open: boolean) => void;
