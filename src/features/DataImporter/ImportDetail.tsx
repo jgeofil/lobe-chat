@@ -7,11 +7,11 @@ import { Info } from 'lucide-react';
 import { useState } from 'react';
 import { Flexbox } from 'react-layout-kit';
 
-import { ExportPgDataStructure } from '@/types/export';
+import { ImportPgDataStructure } from '@/types/export';
 
 const { Text } = Typography;
 
-const getNonEmptyTables = (data: ExportPgDataStructure) => {
+const getNonEmptyTables = (data: ImportPgDataStructure) => {
   const result = [];
 
   for (const [key, value] of Object.entries(data.data)) {
@@ -81,7 +81,7 @@ const useStyles = createStyles(({ token, css }) => {
 });
 
 interface ImportPreviewModalProps {
-  importData: ExportPgDataStructure;
+  importData: ImportPgDataStructure;
   onCancel?: () => void;
   onConfirm?: (overwriteExisting: boolean) => void;
   onOpenChange: (open: boolean) => void;
@@ -96,7 +96,7 @@ const ImportPreviewModal = ({
   importData,
 }: ImportPreviewModalProps) => {
   const { styles } = useStyles();
-  const [duplicateAction, setDuplicateAction] = useState<string>('skip');
+  const [duplicateAction] = useState<string>('skip');
   const tables = getNonEmptyTables(importData);
   const totalRecords = getTotalRecords(tables);
 
@@ -169,25 +169,25 @@ const ImportPreviewModal = ({
             />
           </div>
 
-          <Flexbox>
-            重复数据处理方式：
-            <div className={styles.duplicateOptions}>
-              <Radio.Group
-                onChange={(e) => setDuplicateAction(e.target.value)}
-                value={duplicateAction}
-              >
-                <Space>
-                  <Radio value="skip">跳过</Radio>
-                  <Radio value="overwrite">覆盖</Radio>
-                </Space>
-              </Radio.Group>
-            </div>
-            <div className={styles.duplicateDescription}>
-              {duplicateAction === 'skip'
-                ? '选择跳过将仅导入不重复的数据，保留现有数据不变。'
-                : '选择覆盖将使用导入数据替换系统中具有相同 ID 的现有记录。'}
-            </div>
-          </Flexbox>
+          {/*<Flexbox>*/}
+          {/*  重复数据处理方式：*/}
+          {/*  <div className={styles.duplicateOptions}>*/}
+          {/*    <Radio.Group*/}
+          {/*      onChange={(e) => setDuplicateAction(e.target.value)}*/}
+          {/*      value={duplicateAction}*/}
+          {/*    >*/}
+          {/*      <Space>*/}
+          {/*        <Radio value="skip">跳过</Radio>*/}
+          {/*        <Radio value="overwrite">覆盖</Radio>*/}
+          {/*      </Space>*/}
+          {/*    </Radio.Group>*/}
+          {/*  </div>*/}
+          {/*  <div className={styles.duplicateDescription}>*/}
+          {/*    {duplicateAction === 'skip'*/}
+          {/*      ? '选择跳过将仅导入不重复的数据，保留现有数据不变。'*/}
+          {/*      : '选择覆盖将使用导入数据替换系统中具有相同 ID 的现有记录。'}*/}
+          {/*  </div>*/}
+          {/*</Flexbox>*/}
         </Flexbox>
       </div>
     </Modal>

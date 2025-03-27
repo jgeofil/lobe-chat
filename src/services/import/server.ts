@@ -2,7 +2,7 @@ import { DefaultErrorShape } from '@trpc/server/unstable-core-do-not-import';
 
 import { edgeClient, lambdaClient } from '@/libs/trpc/client';
 import { useUserStore } from '@/store/user';
-import { ExportPgDataStructure } from '@/types/export';
+import { ImportPgDataStructure } from '@/types/export';
 import { ImportStage, OnImportCallbacks } from '@/types/importer';
 import { uuid } from '@/utils/uuid';
 
@@ -40,7 +40,7 @@ export class ServerService implements IImportService {
         const duration = Date.now() - time;
 
         callbacks?.onStageChange?.(ImportStage.Success);
-        callbacks?.onSuccess?.(result, duration);
+        callbacks?.onSuccess?.(result.results, duration);
       } catch (e) {
         handleError(e);
       }
@@ -68,14 +68,14 @@ export class ServerService implements IImportService {
       const result = await lambdaClient.importer.importByFile.mutate({ pathname });
       const duration = Date.now() - time;
       callbacks?.onStageChange?.(ImportStage.Success);
-      callbacks?.onSuccess?.(result, duration);
+      callbacks?.onSuccess?.(result.results, duration);
     } catch (e) {
       handleError(e);
     }
   };
 
   importPgData: IImportService['importPgData'] = async (
-    data: ExportPgDataStructure,
+    data: ImportPgDataStructure,
     {
       callbacks,
     }: {
@@ -103,11 +103,11 @@ export class ServerService implements IImportService {
       callbacks?.onStageChange?.(ImportStage.Importing);
       const time = Date.now();
       try {
-        const result = await lambdaClient.importer.importByPost.mutate({ data });
+        const result = await lambdaClient.importer.importByPost.mutate({ data: data });
         const duration = Date.now() - time;
 
         callbacks?.onStageChange?.(ImportStage.Success);
-        callbacks?.onSuccess?.(result, duration);
+        callbacks?.onSuccess?.(result.results, duration);
       } catch (e) {
         handleError(e);
       }
@@ -135,7 +135,7 @@ export class ServerService implements IImportService {
       const result = await lambdaClient.importer.importByFile.mutate({ pathname });
       const duration = Date.now() - time;
       callbacks?.onStageChange?.(ImportStage.Success);
-      callbacks?.onSuccess?.(result, duration);
+      callbacks?.onSuccess?.(result.results, duration);
     } catch (e) {
       handleError(e);
     }

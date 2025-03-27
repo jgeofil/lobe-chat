@@ -3,10 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getTestDB } from '@/database/models/__tests__/_util';
 import * as Schema from '@/database/schemas';
-import { ExportPgDataStructure } from '@/types/export';
+import { ImportPgDataStructure } from '@/types/export';
 
 import { DataImporterRepos } from '../index';
 import agentsData from './fixtures/agents.json';
+import agentsToSessionsData from './fixtures/agentsToSessions.json';
 import topicsData from './fixtures/topic.json';
 import userSettingsData from './fixtures/userSettings.json';
 
@@ -28,7 +29,7 @@ beforeEach(async () => {
 
 describe('DataImporter', () => {
   describe('import userSettings', () => {
-    const data = userSettingsData as ExportPgDataStructure;
+    const data = userSettingsData as ImportPgDataStructure;
     it('should import userSettings correctly', async () => {
       const result = await importer.importPgData(data);
 
@@ -71,7 +72,7 @@ describe('DataImporter', () => {
 
   describe('import agents and sessions', () => {
     it('should import return correct result', async () => {
-      const data = agentsData as ExportPgDataStructure;
+      const data = agentsData as ImportPgDataStructure;
       const result = await importer.importPgData(data);
 
       expect(result.success).toBe(true);
@@ -98,11 +99,45 @@ describe('DataImporter', () => {
       expect(agentRes[0].clientId).toEqual(agentsData.data.agents[0].id);
       expect(sessionRes[0].clientId).toEqual(agentsData.data.sessions[0].id);
     });
+
+    it('should skip duplicated data by default', async () => {
+      const data = agentsData as ImportPgDataStructure;
+      const result = await importer.importPgData(data);
+
+      expect(result.success).toBe(true);
+      expect(result.results.agents).toMatchObject({ added: 1, errors: 0, skips: 0 });
+
+      // import again to make sure it skip duplicated by default
+      const result2 = await importer.importPgData(data);
+      expect(result2.success).toBe(true);
+      expect(result2.results).toEqual({
+        agents: { added: 0, errors: 0, skips: 1, updated: 0 },
+        agentsToSessions: { added: 0, errors: 0, skips: 1, updated: 0 },
+        sessions: { added: 0, errors: 0, skips: 1, updated: 0 },
+      });
+    });
+
+    it('should import without agentToSessions error', async () => {
+      const data = agentsToSessionsData as ImportPgDataStructure;
+      const result = await importer.importPgData(data);
+
+      expect(result.success).toBe(true);
+      expect(result.results.agentsToSessions).toMatchObject({ added: 9, errors: 0, skips: 0 });
+
+      // import again to make sure it skip duplicated by default
+      const result2 = await importer.importPgData(data);
+      expect(result2.success).toBe(true);
+      expect(result2.results).toEqual({
+        agents: { added: 0, errors: 0, skips: 9, updated: 0 },
+        agentsToSessions: { added: 0, errors: 0, skips: 9, updated: 0 },
+        sessions: { added: 0, errors: 0, skips: 9, updated: 0 },
+      });
+    });
   });
 
   describe('import message and topic', () => {
     it('should import return correct result', async () => {
-      const exportData = topicsData as ExportPgDataStructure;
+      const exportData = topicsData as ImportPgDataStructure;
       const result = await importer.importPgData(exportData);
 
       expect(result.success).toBe(true);
@@ -122,6 +157,21 @@ describe('DataImporter', () => {
       expect(
         messageRes.find((msg) => msg.content === topicsData.data.messages[0].content)?.clientId,
       ).toEqual(topicsData.data.messages[0].id);
+    });
+
+    it('should only return non-zero result', async () => {
+      const exportData = topicsData as ImportPgDataStructure;
+      const result = await importer.importPgData(exportData);
+
+      expect(result.success).toBe(true);
+      expect(result.results).toEqual({
+        agents: { added: 1, errors: 0, skips: 0, updated: 0 },
+        agentsToSessions: { added: 1, errors: 0, skips: 0, updated: 0 },
+        messagePlugins: { added: 1, errors: 0, skips: 0, updated: 0 },
+        messages: { added: 6, errors: 0, skips: 0, updated: 0 },
+        sessions: { added: 1, errors: 0, skips: 0, updated: 0 },
+        topics: { added: 1, errors: 0, skips: 0, updated: 0 },
+      });
     });
   });
 });

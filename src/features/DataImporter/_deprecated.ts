@@ -1,3 +1,5 @@
+import { t } from 'i18next';
+
 import { notification } from '@/components/AntdStaticMethods';
 import { Migration } from '@/migrations';
 import { ConfigFile } from '@/types/exportConfig';
@@ -15,14 +17,27 @@ export const importConfigFile = async (
 
   try {
     const config = JSON.parse(text);
+
+    // it means the config file is exported from a newer version
+    if ('schemaHash' in config) {
+      notification.error({
+        description: t('import.incompatible.description', { ns: 'error' }),
+        message: t('import.incompatible.title', { ns: 'error' }),
+      });
+      return;
+    }
+
     const { state, version } = Migration.migrate(config);
 
     await onConfigImport({ ...config, state, version });
   } catch (error) {
     console.error(error);
     notification.error({
-      description: `出错原因: ${(error as Error).message}`,
-      message: '导入失败',
+      description: t('import.importConfigFile.description', {
+        ns: 'error',
+        reason: (error as any).message,
+      }),
+      message: t('import.importConfigFile.title', { ns: 'error' }),
     });
   }
 };

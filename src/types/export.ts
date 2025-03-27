@@ -4,7 +4,7 @@ export interface ExportDatabaseData {
   url?: string;
 }
 
-export interface ExportPgDataStructure {
+export interface ImportPgDataStructure {
   data: Record<string, object[]>;
   mode: 'pglite' | 'postgres';
   schemaHash: string;

@@ -209,6 +209,7 @@ export default {
       skips: '重复跳过',
       topics: '话题',
       type: '数据类型',
+      update: '记录更新',
     },
     title: '导入数据',
     uploading: {

@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import { BRANDING_NAME } from '@/const/branding';
 import { isDeprecatedEdition, isServerMode } from '@/const/version';
 import { CURRENT_CONFIG_VERSION } from '@/migrations';
-import { ExportPgDataStructure } from '@/types/export';
+import { ImportPgDataStructure } from '@/types/export';
 import { downloadFile } from '@/utils/client/downloadFile';
 import { exportJSONFile } from '@/utils/client/exportFile';
 
@@ -93,7 +93,7 @@ class ConfigService {
   private createDataStructure = async (
     data: any,
     mode: 'pglite' | 'postgres',
-  ): Promise<ExportPgDataStructure> => {
+  ): Promise<ImportPgDataStructure> => {
     const { default: json } = await import('@/database/client/migrations.json');
     const latestHash = json.at(-1)?.hash;
     if (!latestHash) {

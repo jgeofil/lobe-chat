@@ -23,7 +23,7 @@ export class ClientService extends BaseClientService implements IImportService {
       const duration = Date.now() - time;
 
       callbacks?.onStageChange?.(ImportStage.Success);
-      callbacks?.onSuccess?.(result, duration);
+      callbacks?.onSuccess?.(result.results, duration);
     } catch (e) {
       console.error(e);
       callbacks?.onStageChange?.(ImportStage.Error);
@@ -33,11 +33,17 @@ export class ClientService extends BaseClientService implements IImportService {
     }
   };
 
-  importPgData: IImportService['importPgData'] = async (data, { callbacks } = {}) => {
+  importPgData: IImportService['importPgData'] = async (
+    data,
+    { callbacks, overwriteExisting } = {},
+  ) => {
     callbacks?.onStageChange?.(ImportStage.Importing);
     const time = Date.now();
     try {
-      const result = await this.dataImporter.importPgData(data);
+      const result = await this.dataImporter.importPgData(
+        data,
+        overwriteExisting ? 'override' : 'skip',
+      );
 
       const duration = Date.now() - time;
 

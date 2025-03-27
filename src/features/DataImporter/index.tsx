@@ -13,7 +13,7 @@ import { importService } from '@/services/import';
 import { ClientService, ImportResult, ImportResults } from '@/services/import/_deprecated';
 import { useChatStore } from '@/store/chat';
 import { useSessionStore } from '@/store/session';
-import { ExportDatabaseData, ExportPgDataStructure } from '@/types/export';
+import { ImportPgDataStructure } from '@/types/export';
 import { ErrorShape, FileUploadState, ImportStage } from '@/types/importer';
 
 import ImportError from './Error';
@@ -57,15 +57,14 @@ const DataImporter = memo<DataImporterProps>(({ children, onFinishImport }) => {
   const [importError, setImportError] = useState<ErrorShape | undefined>();
   const [importResults, setImportResults] = useState<ImportResults | undefined>();
   const [showImportModal, setShowImportModal] = useState(false);
-  const [showImportData, setShowImportData] = useState<ExportDatabaseData | undefined>(
-    undefined,
-  );
+  const [importPgData, setImportPgData] = useState<ImportPgDataStructure | undefined>(undefined);
 
   const dataSource = useMemo(() => {
     if (!importResults) return;
 
     const { type, ...res } = importResults;
 
+    console.log(res);
     if (type === 'settings') return;
 
     return Object.entries(res)
@@ -74,7 +73,8 @@ const DataImporter = memo<DataImporterProps>(({ children, onFinishImport }) => {
         added: value.added,
         error: value.errors,
         skips: value.skips,
-        title: t(`importModal.result.${item as keyof ImportResults}`),
+        title: item,
+        updated: value.updated || 0,
       }));
   }, [importResults]);
 
@@ -123,7 +123,7 @@ const DataImporter = memo<DataImporterProps>(({ children, onFinishImport }) => {
 
       case ImportStage.Success: {
         return (
-          <Center gap={24} paddingInline={40}>
+          <Center gap={24} paddingInline={16}>
             <SuccessResult dataSource={dataSource} duration={duration} onClickFinish={closeModal} />
           </Center>
         );
@@ -148,13 +148,18 @@ const DataImporter = memo<DataImporterProps>(({ children, onFinishImport }) => {
         icon={ImportIcon}
         open={importState !== ImportStage.Start && importState !== ImportStage.Finished}
         title={t('importModal.title')}
-        width={isFinished ? 500 : 400}
+        width={isFinished ? 600 : 400}
       >
         {content}
       </DataStyleModal>
       <Upload
+        accept={'application/json'}
         beforeUpload={async (file) => {
-          if (isDeprecatedEdition) {
+          const config = await parseConfigFile(file);
+          if (!config) return false;
+
+          if (!('schemaHash' in config)) {
+            // TODO: remove in V2
             await importConfigFile(file, async (config) => {
               setImportState(ImportStage.Preparing);
 
@@ -184,12 +189,8 @@ const DataImporter = memo<DataImporterProps>(({ children, onFinishImport }) => {
             return false;
           }
 
-          const config = await parseConfigFile(file);
-
-          if (config) {
-            setShowImportData(config);
-            setShowImportModal(true);
-          }
+          setImportPgData(config);
+          setShowImportModal(true);
 
           return false;
         }}
@@ -200,11 +201,13 @@ const DataImporter = memo<DataImporterProps>(({ children, onFinishImport }) => {
         {/* a very hackable solution: add a pseudo before to have a large hot zone */}
         <div className={styles.children}>{children}</div>
       </Upload>
-      {showImportData && (
+      {importPgData && (
         <ImportPreviewModal
-          importData={showImportData}
+          importData={importPgData}
           onConfirm={async (overwriteExisting) => {
-            await importService.importPgData(showImportData, {
+            setImportState(ImportStage.Preparing);
+
+            await importService.importPgData(importPgData, {
               callbacks: {
                 onError: (error) => {
                   setImportError(error);
@@ -222,6 +225,10 @@ const DataImporter = memo<DataImporterProps>(({ children, onFinishImport }) => {
               },
               overwriteExisting,
             });
+
+            await refreshSessions();
+            await refreshMessages();
+            await refreshTopics();
           }}
           onOpenChange={setShowImportModal}
           open={showImportModal}

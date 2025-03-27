@@ -1,7 +1,9 @@
-import { notification } from '@/components/AntdStaticMethods';
-import { ExportDatabaseData } from '@/types/export';
+import { t } from 'i18next';
 
-export const parseConfigFile = async (file: File): Promise<ExportDatabaseData | undefined> => {
+import { notification } from '@/components/AntdStaticMethods';
+import { ImportPgDataStructure } from '@/types/export';
+
+export const parseConfigFile = async (file: File): Promise<ImportPgDataStructure | undefined> => {
   const text = await file.text();
 
   try {
@@ -9,8 +11,11 @@ export const parseConfigFile = async (file: File): Promise<ExportDatabaseData | 
   } catch (error) {
     console.error(error);
     notification.error({
-      description: `出错原因: ${(error as Error).message}`,
-      message: '导入失败',
+      description: t('import.importConfigFile.description', {
+        ns: 'error',
+        reason: (error as any).message,
+      }),
+      message: t('import.importConfigFile.title', { ns: 'error' }),
     });
   }
 };

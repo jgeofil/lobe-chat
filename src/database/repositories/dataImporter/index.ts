@@ -2,7 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm/expressions';
 
 import * as EXPORT_TABLES from '@/database/schemas';
 import { LobeChatDatabase } from '@/database/type';
-import { ExportPgDataStructure } from '@/types/export';
+import { ImportPgDataStructure } from '@/types/export';
 import { ImportResultData, ImporterEntryData } from '@/types/importer';
 import { uuid } from '@/utils/uuid';
 
@@ -10,15 +10,16 @@ import { DeprecatedDataImporterRepos } from './deprecated';
 
 interface ImportResult {
   added: number;
-  conflictFields?: string[];
   errors: number;
   skips: number;
   updated?: number;
 }
 
+type ConflictStrategy = 'skip' | 'override' | 'merge';
+
 interface TableImportConfig {
   // 冲突处理策略
-  conflictStrategy?: 'skip' | 'modify' | 'merge';
+  conflictStrategy?: ConflictStrategy;
   // 字段处理函数
   fieldProcessors?: {
     [field: string]: (value: any) => any;
@@ -112,6 +113,7 @@ const IMPORT_TABLE_CONFIG: TableImportConfig[] = [
     table: 'topics',
   },
   {
+    conflictStrategy: 'skip',
     isCompositeKey: true, // 使用复合主键 [agentId, sessionId]
     relations: [
       {
@@ -124,6 +126,7 @@ const IMPORT_TABLE_CONFIG: TableImportConfig[] = [
       },
     ],
     table: 'agentsToSessions',
+    uniqueConstraints: ['agentId', 'sessionId'],
   },
   {
     relations: [
@@ -211,19 +214,19 @@ const IMPORT_TABLE_CONFIG: TableImportConfig[] = [
     ],
     table: 'messageQueryChunks',
   },
-  {
-    relations: [
-      {
-        field: 'messageId',
-        sourceTable: 'messages',
-      },
-      {
-        field: 'embeddingsId',
-        sourceTable: 'embeddings',
-      },
-    ],
-    table: 'messageQueries',
-  },
+  // {
+  //   relations: [
+  //     {
+  //       field: 'messageId',
+  //       sourceTable: 'messages',
+  //     },
+  //     {
+  //       field: 'embeddingsId',
+  //       sourceTable: 'embeddings',
+  //     },
+  //   ],
+  //   table: 'messageQueries',
+  // },
   {
     conflictStrategy: 'skip',
     preserveId: true, // 使用消息ID作为主键
@@ -235,21 +238,21 @@ const IMPORT_TABLE_CONFIG: TableImportConfig[] = [
     ],
     table: 'messageTranslates',
   },
-  {
-    conflictStrategy: 'skip',
-    preserveId: true, // 使用消息ID作为主键
-    relations: [
-      {
-        field: 'id',
-        sourceTable: 'messages',
-      },
-      {
-        field: 'fileId',
-        sourceTable: 'files',
-      },
-    ],
-    table: 'messageTTS',
-  },
+  // {
+  //   conflictStrategy: 'skip',
+  //   preserveId: true, // 使用消息ID作为主键
+  //   relations: [
+  //     {
+  //       field: 'id',
+  //       sourceTable: 'messages',
+  //     },
+  //     {
+  //       field: 'fileId',
+  //       sourceTable: 'files',
+  //     },
+  //   ],
+  //   table: 'messageTTS',
+  // },
 ];
 
 export class DataImporterRepos {
@@ -273,7 +276,10 @@ export class DataImporterRepos {
   /**
    * 导入PostgreSQL数据
    */
-  async importPgData(dbData: ExportPgDataStructure): Promise<ImportResultData> {
+  async importPgData(
+    dbData: ImportPgDataStructure,
+    conflictStrategy: ConflictStrategy = 'skip',
+  ): Promise<ImportResultData> {
     const results: Record<string, ImportResult> = {};
     const { data } = dbData;
 
@@ -282,9 +288,6 @@ export class DataImporterRepos {
     this.conflictRecords = {};
 
     try {
-      // 预先判断是否存在clientId重复问题
-      await this.checkClientIdConflicts(data);
-
       await this.db.transaction(async (trx) => {
         // 按配置顺序导入表
         for (const config of IMPORT_TABLE_CONFIG) {
@@ -294,26 +297,24 @@ export class DataImporterRepos {
           const tableData = data[tableName];
 
           if (!tableData || tableData.length === 0) {
-            results[tableName] = { added: 0, errors: 0, skips: 0 };
             continue;
           }
 
-          console.log(`Importing table: ${tableName}, records: ${tableData.length}`);
-
           // 使用统一的导入方法
-          results[tableName] = await this.importTableData(trx, config, tableData);
+          const result = await this.importTableData(trx, config, tableData, conflictStrategy);
+          console.log(`imported table: ${tableName}, records: ${tableData.length}`);
+
+          if (Object.values(result).some((value) => value > 0)) {
+            results[tableName] = result;
+          }
         }
       });
 
-      return {
-        // conflictRecords: this.conflictRecords,
-        results,
-        success: true,
-      };
+      return { results, success: true };
     } catch (error) {
       console.error('Import failed:', error);
+
       return {
-        // conflictRecords: this.conflictRecords,
         error: {
           details: this.extractErrorDetails(error),
           message: (error as any).message,
@@ -321,48 +322,6 @@ export class DataImporterRepos {
         results,
         success: false,
       };
-    }
-  }
-
-  /**
-   * 预检查clientId是否存在冲突
-   */
-  private async checkClientIdConflicts(data: any) {
-    for (const config of IMPORT_TABLE_CONFIG) {
-      const { table: tableName } = config;
-
-      // @ts-ignore
-      const tableData = data[tableName];
-      if (!tableData || tableData.length === 0) continue;
-
-      // @ts-ignore
-      const table = EXPORT_TABLES[tableName];
-
-      // 只检查有clientId字段的表
-      if (!('clientId' in table) || !('userId' in table)) continue;
-
-      const clientIds = tableData.map((item: any) => item.clientId).filter(Boolean);
-
-      if (clientIds.length === 0) continue;
-
-      // 查找当前用户下是否已存在相同clientId的记录
-      // @ts-expect-error
-      const existingRecords = await this.db.query[tableName].findMany({
-        where: and(eq(table.userId, this.userId), inArray(table.clientId, clientIds)),
-      });
-
-      // 存储已存在记录的ID映射
-      if (!this.idMaps[tableName]) {
-        this.idMaps[tableName] = {};
-      }
-
-      for (const record of existingRecords) {
-        // 对于每条已存在的记录，建立clientId到id的映射
-        this.idMaps[tableName][record.clientId] = record.id;
-
-        // 同时也建立id到id的映射（用于处理关系引用）
-        this.idMaps[tableName][record.id] = record.id;
-      }
     }
   }
 
@@ -392,13 +351,15 @@ export class DataImporterRepos {
     trx: any,
     config: TableImportConfig,
     tableData: any[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _userConflictStrategy: ConflictStrategy,
   ): Promise<ImportResult> {
     const {
       table: tableName,
       preserveId,
       isCompositeKey = false,
       uniqueConstraints = [],
-      conflictStrategy = 'modify',
+      conflictStrategy = 'override',
       fieldProcessors = {},
       relations = [],
       selfReferences = [],
@@ -406,22 +367,19 @@ export class DataImporterRepos {
 
     // @ts-ignore
     const table = EXPORT_TABLES[tableName];
-    const result: ImportResult = { added: 0, conflictFields: [], errors: 0, skips: 0, updated: 0 };
+    const result: ImportResult = { added: 0, errors: 0, skips: 0, updated: 0 };
+
+    // 初始化该表的ID映射
+    if (!this.idMaps[tableName]) {
+      this.idMaps[tableName] = {};
+    }
 
     try {
-      // 初始化该表的ID映射
-      if (!this.idMaps[tableName]) {
-        this.idMaps[tableName] = {};
-      }
-
       // 1. 查找已存在的记录（基于clientId和userId）
       let existingRecords: any[] = [];
 
       if ('clientId' in table && 'userId' in table) {
-        const clientIds = tableData
-          .filter((item) => item.clientId)
-          .map((item) => item.clientId)
-          .filter(Boolean);
+        const clientIds = tableData.map((item) => item.clientId || item.id).filter(Boolean);
 
         if (clientIds.length > 0) {
           existingRecords = await trx.query[tableName].findMany({
@@ -466,7 +424,7 @@ export class DataImporterRepos {
         (item) =>
           !existingRecords.some(
             (record) =>
-              (record.clientId === item.clientId && record.clientId) ||
+              (record.clientId === (item.clientId || item.id) && record.clientId) ||
               (preserveId && !isCompositeKey && record.id === item.id),
           ),
       );
@@ -553,49 +511,105 @@ export class DataImporterRepos {
 
       // 5. 检查唯一约束并应用冲突策略
       for (const record of preparedData) {
-        // 处理唯一约束
-        for (const field of uniqueConstraints) {
-          if (!record.newRecord[field]) continue;
+        if (isCompositeKey && uniqueConstraints.length > 0) {
+          // 对于复合主键表，将所有唯一约束字段作为一个组合条件
+          const whereConditions = uniqueConstraints
+            .filter((field) => record.newRecord[field] !== undefined)
+            .map((field) => eq(table[field], record.newRecord[field]));
 
-          // 检查字段值是否已存在
-          const exists = await trx.query[tableName].findFirst({
-            where: eq(table[field], record.newRecord[field]),
-          });
+          // 添加userId条件（如果表有userId字段）
+          if ('userId' in table) {
+            whereConditions.push(eq(table.userId, this.userId));
+          }
 
-          if (exists) {
-            // 记录冲突
-            if (!this.conflictRecords[tableName]) this.conflictRecords[tableName] = [];
-            this.conflictRecords[tableName].push({
-              field,
-              value: record.newRecord[field],
+          if (whereConditions.length > 0) {
+            const exists = await trx.query[tableName].findFirst({
+              where: and(...whereConditions),
             });
 
-            // 应用冲突策略
-            switch (conflictStrategy) {
-              case 'skip': {
-                record.newRecord._skip = true;
-                result.skips++;
-                break;
-              }
-              case 'modify': {
-                // 应用字段处理器
-                if (field in fieldProcessors) {
-                  record.newRecord[field] = fieldProcessors[field](record.newRecord[field]);
+            if (exists) {
+              // 记录冲突
+              if (!this.conflictRecords[tableName]) this.conflictRecords[tableName] = [];
+              this.conflictRecords[tableName].push({
+                field: uniqueConstraints.join(','),
+                value: uniqueConstraints
+                  .map((field) => `${field}=${record.newRecord[field]}`)
+                  .join(','),
+              });
+
+              // 应用冲突策略
+              switch (conflictStrategy) {
+                case 'skip': {
+                  record.newRecord._skip = true;
+                  result.skips++;
+                  break;
                 }
-                break;
-              }
-              case 'merge': {
-                // 合并数据
-                await trx
-                  .update(table)
-                  .set(record.newRecord)
-                  .where(eq(table[field], record.newRecord[field]));
-                record.newRecord._skip = true;
-                if (result.updated) result.updated++;
-                else {
-                  result.updated = 1;
+                case 'override': {
+                  // 不需要额外操作，插入时会覆盖
+                  break;
                 }
-                break;
+                case 'merge': {
+                  // 合并数据
+                  await trx
+                    .update(table)
+                    .set(record.newRecord)
+                    .where(and(...whereConditions));
+                  record.newRecord._skip = true;
+                  if (result.updated) result.updated++;
+                  else {
+                    result.updated = 1;
+                  }
+                  break;
+                }
+              }
+            }
+          }
+        } else {
+          // 处理唯一约束
+          for (const field of uniqueConstraints) {
+            if (!record.newRecord[field]) continue;
+
+            // 检查字段值是否已存在
+            const exists = await trx.query[tableName].findFirst({
+              where: eq(table[field], record.newRecord[field]),
+            });
+
+            if (exists) {
+              // 记录冲突
+              if (!this.conflictRecords[tableName]) this.conflictRecords[tableName] = [];
+              this.conflictRecords[tableName].push({
+                field,
+                value: record.newRecord[field],
+              });
+
+              // 应用冲突策略
+              switch (conflictStrategy) {
+                case 'skip': {
+                  record.newRecord._skip = true;
+                  result.skips++;
+                  break;
+                }
+                case 'override': {
+                  // 应用字段处理器
+                  if (field in fieldProcessors) {
+                    record.newRecord[field] = fieldProcessors[field](record.newRecord[field]);
+                  }
+                  break;
+                }
+
+                case 'merge': {
+                  // 合并数据
+                  await trx
+                    .update(table)
+                    .set(record.newRecord)
+                    .where(eq(table[field], record.newRecord[field]));
+                  record.newRecord._skip = true;
+                  if (result.updated) result.updated++;
+                  else {
+                    result.updated = 1;
+                  }
+                  break;
+                }
               }
             }
           }
@@ -620,6 +634,7 @@ export class DataImporterRepos {
         try {
           // 插入并返回结果
           const insertQuery = trx.insert(table).values(itemsToInsert);
+
           let insertResult;
 
           // 只对非复合主键表需要返回ID
@@ -656,10 +671,6 @@ export class DataImporterRepos {
             const match = (error as any).detail?.match(/Key \((.+?)\)=\((.+?)\) already exists/);
             if (match) {
               const conflictField = match[1];
-              if (!result.conflictFields) result.conflictFields = [];
-              if (!result.conflictFields.includes(conflictField)) {
-                result.conflictFields.push(conflictField);
-              }
 
               if (!this.conflictRecords[tableName]) this.conflictRecords[tableName] = [];
               this.conflictRecords[tableName].push({
